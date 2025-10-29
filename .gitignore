@@ -1,0 +1,9 @@
+# Heavy local junk (do not track)
+attached_assets/
+backup_*/
+web/canvaskit/
+
+# Large binaries anywhere
+*.zip
+*.mov
+*.mp4

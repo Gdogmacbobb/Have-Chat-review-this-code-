@@ -1,0 +1,61 @@
+name: ynfny
+description: A new Flutter project.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.3.0
+
+dependencies:
+  flutter:       # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+    sdk: flutter # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+  
+  # 🚨 CRITICAL: Core UI and responsive design - DO NOT REMOVE OR MODIFY
+  sizer: ^2.0.15              # Required for responsive design system
+  flutter_svg: ^2.0.9        # Required for SVG icon support
+  google_fonts: ^6.1.0       # Required for typography (replaces local fonts)
+  shared_preferences: ^2.2.2 # Required for local data storage
+  
+  # Feature dependencies - safe to modify
+  cached_network_image: ^3.2.3
+  connectivity_plus: ^5.0.2
+  dio: ^5.3.2
+  fluttertoast: ^8.2.2
+  fl_chart: ^0.64.0
+  camera: ^0.10.5+2
+  permission_handler: ^10.4.3
+  geolocator: ^9.0.2
+  
+  # Supabase integration
+  supabase_flutter: ^2.5.6
+  
+  # Media handling
+  image_picker: ^1.1.2
+  record: ^4.4.4
+  path_provider: ^2.0.15
+  file_picker: ^6.0.0
+  
+  # Payment processing
+  pay: ^3.2.1
+  stripe_platform_interface: ^11.5.0
+
+  universal_html: ^2.2.4
+dev_dependencies:
+  flutter_test:    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+    sdk: flutter   # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+  flutter_lints: ^3.0.0 # Downgraded for Dart SDK 3.3.0 compatibility
+
+flutter:
+  uses-material-design: true # 🚨 CRITICAL: Required for Material icon font - DO NOT REMOVE
+  assets:
+    - assets/
+    - assets/images/
+  # 🚨 CRITICAL ASSET MANAGEMENT RULES:
+  # - DO NOT ADD NEW ASSET DIRECTORIES (assets/svg/, assets/icons/, etc.)
+  # - ONLY USE EXISTING AND ITEMS AVAILABLE IN THE DIRECTORIES LISTED ABOVE (assets/, assets/images/)
+  
+  # 🚨 CRITICAL FONTS RULE: 
+  # - THIS PROJECT USES GOOGLE FONTS INSTEAD OF LOCAL FONTS
+  # - DO NOT ADD ANY LOCAL FONTS SECTION OR FONT FILES
+  # - ALL FONTS MUST BE LOADED VIA google_fonts PACKAGE
+  # - DEFAULT FONT: Use GoogleFonts.inter() unless specified otherwise

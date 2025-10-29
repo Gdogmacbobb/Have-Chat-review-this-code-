@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base href="/">
+    <meta charset="UTF-8">
+    <title>YNFNY</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-store">
+    <meta name="flutter-web-renderer" content="html">
+    <style>
+      /* Edge-to-edge layout for iOS/web */
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+
+      /* Use dynamic viewport to avoid iOS 100vh bug */
+      body, #flutter_host_element, flt-glass-pane {
+        height: 100dvh;
+        position: relative;
+      }
+
+      /* Video layer fills screen edge-to-edge */
+      video, .video-canvas, flt-platform-view video {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100dvh;
+        object-fit: cover;
+        z-index: 0;
+      }
+
+      /* Safe-area support for header gradient - paint behind notch */
+      .safe-top {
+        padding-top: env(safe-area-inset-top);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ================================================================== -->
+    <!-- HARD DIAGNOSTIC: HTML Freshness Verification + Recorder Factory -->
+    <!-- ================================================================== -->
+    
+    <script id="preboot-diagnostic-0">
+      // ========================================================================
+      // STEP 0: HTML FRESHNESS VERIFICATION (DETECT STALE CACHE)
+      // ========================================================================
+      (function() {
+        console.log('[PREBOOT] ⚙️ Running hard diagnostic for recorder factory...');
+        
+        // Force verify HTML came from network, not cache
+        fetch(window.location.href, { cache: 'no-store', mode: 'same-origin' })
+          .then(() => console.log('[PREBOOT] ✅ HTML verified fresh from network'))
+          .catch(err => console.warn('[PREBOOT] ⚠️ Could not verify HTML freshness:', err.message));
+      })();
+    </script>
+    
+    <!-- Step 1: Load Whammy.js synchronously (required for iOS fallback) -->
+    <script src="https://cdn.jsdelivr.net/npm/whammy@0.0.1/whammy.min.js"></script>
+    
+    <!-- Step 2: Detect environment and configure MediaRecorder -->
+    <script id="preboot-diagnostic-1">
+      // ========================================================================
+      // STEP 1: iOS/REPLIT DETECTION + MEDIARECORDER OVERRIDE
+      // ========================================================================
+      (function() {
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua) || 
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isReplitApp = /Replit|WebView|wv|Bonsai/.test(ua);
+        
+        if (isIOS || isReplitApp) {
+          console.log('[PREBOOT] 🧩 iOS/Replit detected — MediaRecorder disabled, fallback enforced');
+          console.log('[PREBOOT] UA:', ua);
+          console.log('[PREBOOT] Platform:', navigator.platform);
+          
+          // Completely remove MediaRecorder so fallback is guaranteed
+          window.MediaRecorder = undefined;
+          
+          console.log('[PREBOOT] ✓ MediaRecorder override complete');
+        } else {
+          console.log('[PREBOOT] Desktop browser - MediaRecorder enabled');
+        }
+      })();
+    </script>
+    
+    <script>
+      // ========================================================================
+      // PROTECTED CLOSURE STORAGE (survives Flutter initialization)
+      // ========================================================================
+      const PROTECTED_RECORDER_STORAGE = (function() {
+        let _createRecorder = null;
+        let _createNativeRecorder = null;
+        
+        return {
+          setCreateRecorder: function(fn) {
+            _createRecorder = fn;
+            console.log('[REC_STORAGE] ✓ Stored createRecorder in protected closure');
+          },
+          setCreateNativeRecorder: function(fn) {
+            _createNativeRecorder = fn;
+            console.log('[REC_STORAGE] ✓ Stored createNativeRecorder in protected closure');
+          },
+          getCreateRecorder: function() {
+            return _createRecorder;
+          },
+          getCreateNativeRecorder: function() {
+            return _createNativeRecorder;
+          }
+        };
+      })();
+      
+      // Fallback Canvas Recorder for iOS (using Whammy.js)
+      class FallbackRecorder {
+        constructor() {
+          this.frames = [];
+          this.canvas = null;
+          this.ctx = null;
+          this.video = null;
+          this.captureInterval = null;
+          this.stream = null;
+          this.isRecording = false;
+        }
+        
+        async start(stream) {
+          console.log('[REC_FALLBACK] ✓ Canvas-based recording started (15fps WebM via Whammy.js)');
+          
+          this.stream = stream;
+          this.frames = [];
+          
+          // Create video element to capture frames from
+          this.video = document.createElement('video');
+          this.video.srcObject = stream;
+          this.video.muted = true;
+          this.video.playsInline = true;
+          
+          await this.video.play();
+          
+          // Wait for video metadata to load
+          await new Promise((resolve) => {
+            if (this.video.readyState >= 2) {
+              resolve();
+            } else {
+              this.video.onloadedmetadata = resolve;
+            }
+          });
+          
+          // Create canvas matching video dimensions
+          this.canvas = document.createElement('canvas');
+          this.canvas.width = this.video.videoWidth || 640;
+          this.canvas.height = this.video.videoHeight || 480;
+          this.ctx = this.canvas.getContext('2d');
+          
+          console.log('[REC_FALLBACK] Canvas:', this.canvas.width, 'x', this.canvas.height);
+          
+          // Capture frames at 15fps (balance quality vs performance)
+          this.isRecording = true;
+          this.captureInterval = setInterval(() => {
+            if (this.isRecording && this.video && this.ctx) {
+              this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+              const dataURL = this.canvas.toDataURL('image/webp', 0.8);
+              this.frames.push(dataURL);
+            }
+          }, 1000 / 15); // 15 FPS
+          
+          console.log('[REC_FALLBACK] Started, state=recording');
+        }
+        
+        async stop() {
+          console.log('[REC_FALLBACK] Stopping, frames captured:', this.frames.length);
+          
+          this.isRecording = false;
+          
+          if (this.captureInterval) {
+            clearInterval(this.captureInterval);
+            this.captureInterval = null;
+          }
+          
+          if (this.video) {
+            this.video.pause();
+            this.video.srcObject = null;
+          }
+          
+          // Convert frames to WebM using Whammy
+          if (this.frames.length === 0) {
+            console.error('[REC_FALLBACK] No frames captured');
+            throw new Error('No frames captured');
+          }
+          
+          // Create Whammy encoder
+          const encoder = new Whammy.Video(15); // 15 FPS
+          
+          // Add all frames
+          for (const frame of this.frames) {
+            encoder.add(frame);
+          }
+          
+          // Compile to WebM blob
+          const blob = encoder.compile();
+          
+          console.log('[REC_FALLBACK] Blob created:', blob.size, 'bytes, type:', blob.type);
+          
+          // Clean up
+          this.frames = [];
+          this.canvas = null;
+          this.ctx = null;
+          this.video = null;
+          
+          if (blob.size === 0) {
+            throw new Error('Failed to encode video');
+          }
+          
+          return blob;
+        }
+      }
+      
+      // ========================================================================
+      // NATIVE RECORDER FACTORY (desktop only)
+      // ========================================================================
+      const nativeRecorderFactory = async function(stream) {
+        const recordedChunks = [];
+        let mediaRecorder = null;
+        let selectedMimeType = null;
+        
+        // Try codecs in order: VP9 -> VP8 -> WebM -> MP4
+        const mimeTypes = [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm',
+          'video/mp4',
+        ];
+        
+        for (const mimeType of mimeTypes) {
+          if (MediaRecorder.isTypeSupported(mimeType)) {
+            selectedMimeType = mimeType;
+            console.log('[REC_INIT] Selected codec:', mimeType);
+            break;
+          }
+        }
+        
+        if (!selectedMimeType) {
+          console.warn('[REC_INIT] No explicit MIME supported, using default');
+          selectedMimeType = 'video/webm';
+        }
+        
+        // Create MediaRecorder now
+        try {
+          mediaRecorder = new MediaRecorder(stream, {
+            mimeType: selectedMimeType,
+            videoBitsPerSecond: 2500000,
+          });
+        } catch (e) {
+          console.error('[REC_INIT] Error with MIME, using default:', e.message);
+          mediaRecorder = new MediaRecorder(stream, {
+            videoBitsPerSecond: 2500000,
+          });
+        }
+        
+        // Event handlers
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+            console.log('[REC_CHUNK] Received:', event.data.size, 'bytes');
+          }
+        };
+        
+        mediaRecorder.onerror = (event) => {
+          console.error('[REC_ERROR]', event.error);
+        };
+        
+        console.log('[REC_INIT] ✓ Native recorder created, MIME:', mediaRecorder.mimeType);
+        
+        // Return recorder object with start/stop methods
+        return {
+          kind: 'native',
+          
+          async start() {
+            console.log('[REC_START] Starting native MediaRecorder');
+            recordedChunks.length = 0; // Clear previous chunks
+            mediaRecorder.start(1000);
+            console.log('[REC_START] ✓ Native recording active, state:', mediaRecorder.state);
+          },
+          
+          async stop() {
+            console.log('[REC_STOP] Stopping native MediaRecorder');
+            return new Promise((resolve, reject) => {
+              mediaRecorder.onstop = () => {
+                try {
+                  const mimeType = mediaRecorder.mimeType || selectedMimeType || 'video/webm';
+                  const blob = new Blob(recordedChunks, { type: mimeType });
+                  
+                  console.log('[REC_STOP] ✓ Got blob:', blob.size, 'bytes, type:', blob.type);
+                  
+                  if (blob.size === 0) {
+                    reject(new Error('Recording produced no data'));
+                  } else {
+                    resolve(blob);
+                  }
+                } catch (error) {
+                  console.error('[REC_STOP] Error creating blob:', error);
+                  reject(error);
+                }
+              };
+              
+              mediaRecorder.stop();
+            });
+          }
+        };
+      };
+      
+      // ========================================================================
+      // MAIN RECORDER FACTORY (auto-selects native or fallback)
+      // ========================================================================
+      const createRecorderFactory = async function(stream) {
+        console.log('[REC_FACTORY] Factory function called with stream:', !!stream);
+          
+          const hasMediaRecorder = !!window.MediaRecorder;
+          const forceMode = hasMediaRecorder ? 'native' : 'fallback';
+          
+          console.log('[REC_INIT] Creating recorder - mode:', forceMode);
+          
+          if (!hasMediaRecorder) {
+            // iOS/WebView fallback path
+            console.log('[REC_INIT] Using Whammy.js canvas recorder (15fps WebM)');
+            
+            const fallbackInstance = new FallbackRecorder();
+            
+            return {
+              kind: 'fallback',
+              instance: fallbackInstance,
+              
+              async start() {
+                console.log('[REC_START] kind=fallback Starting fallback recorder');
+                await fallbackInstance.start(stream);
+                console.log('[REC_START] ✓ Fallback recording active');
+              },
+              
+              async stop() {
+                console.log('[REC_STOP] kind=fallback Stopping fallback recorder');
+                const blob = await fallbackInstance.stop();
+                console.log('[REC_STOP] ✓ Got blob:', blob.size, 'bytes');
+                return blob;
+              }
+            };
+          } else {
+            // Desktop native path
+            console.log('[REC_INIT] Using native MediaRecorder');
+            return await nativeRecorderFactory(stream);
+          }
+      };
+      
+      // ========================================================================
+      // TRIPLE-ANCHOR STORAGE (window + globalThis + protected closure)
+      // ========================================================================
+      
+      // Store in protected closure (primary, survives Flutter init)
+      PROTECTED_RECORDER_STORAGE.setCreateRecorder(createRecorderFactory);
+      PROTECTED_RECORDER_STORAGE.setCreateNativeRecorder(nativeRecorderFactory);
+      
+      // Also store on window and globalThis for compatibility
+      Object.defineProperty(window, '__createRecorder', {
+        value: createRecorderFactory,
+        writable: false,
+        enumerable: true,
+        configurable: false
+      });
+      
+      Object.defineProperty(window, '__createNativeRecorder', {
+        value: nativeRecorderFactory,
+        writable: false,
+        enumerable: true,
+        configurable: false
+      });
+      
+      Object.defineProperty(globalThis, '__createRecorder', {
+        value: createRecorderFactory,
+        writable: false,
+        enumerable: true,
+        configurable: false
+      });
+      
+      Object.defineProperty(globalThis, '__createNativeRecorder', {
+        value: nativeRecorderFactory,
+        writable: false,
+        enumerable: true,
+        configurable: false
+      });
+      
+      // ========================================================================
+      // GETTER FUNCTIONS (retrieve from protected storage if window cleared)
+      // ========================================================================
+      
+      Object.defineProperty(window, '__getRecorder', {
+        value: function() {
+          console.log('[REC_GETTER] Retrieving recorder factory...');
+          
+          // Try window first
+          if (typeof window.__createRecorder === 'function') {
+            console.log('[REC_GETTER] ✓ Found on window');
+            return window.__createRecorder;
+          }
+          
+          // Try globalThis
+          if (typeof globalThis.__createRecorder === 'function') {
+            console.log('[REC_GETTER] ✓ Found on globalThis');
+            return globalThis.__createRecorder;
+          }
+          
+          // Try protected closure (fallback)
+          const fromClosure = PROTECTED_RECORDER_STORAGE.getCreateRecorder();
+          if (typeof fromClosure === 'function') {
+            console.log('[REC_GETTER] ✓ Retrieved from protected closure');
+            return fromClosure;
+          }
+          
+          console.error('[REC_GETTER] ❌ Factory not found in any storage location!');
+          return null;
+        },
+        writable: false,
+        enumerable: true,
+        configurable: false
+      });
+      
+      Object.defineProperty(window, '__getNativeRecorder', {
+        value: function() {
+          // Try window first
+          if (typeof window.__createNativeRecorder === 'function') {
+            return window.__createNativeRecorder;
+          }
+          
+          // Try globalThis
+          if (typeof globalThis.__createNativeRecorder === 'function') {
+            return globalThis.__createNativeRecorder;
+          }
+          
+          // Try protected closure (fallback)
+          return PROTECTED_RECORDER_STORAGE.getCreateNativeRecorder();
+        },
+        writable: false,
+        enumerable: true,
+        configurable: false
+      });
+      
+      // ========================================================================
+      // STEP 2: FACTORY VERIFICATION (CONFIRM FUNCTIONS EXIST BEFORE FLUTTER)
+      // ========================================================================
+      console.log('[PREBOOT] 🔍 Verifying factory functions...');
+      
+      if (typeof window.__createRecorder !== 'function') {
+        console.error('[PREBOOT] ❌ CRITICAL: __createRecorder is NOT a function!');
+        console.error('[PREBOOT] window.__createRecorder type:', typeof window.__createRecorder);
+        throw new Error('Recorder factory failed to load!');
+      }
+      
+      if (typeof window.__createNativeRecorder !== 'function') {
+        console.error('[PREBOOT] ❌ CRITICAL: __createNativeRecorder is NOT a function!');
+        throw new Error('Native recorder factory failed to load!');
+      }
+      
+      if (typeof window.__getRecorder !== 'function') {
+        console.error('[PREBOOT] ❌ CRITICAL: __getRecorder is NOT a function!');
+        throw new Error('Recorder getter failed to load!');
+      }
+      
+      // SUCCESS - Factory is confirmed ready
+      console.log('[PREBOOT] ✅ RECORDER FACTORY VERIFIED READY');
+      console.log('[REC_HARDLOAD_OK] ✅ Recorder factory ready before Flutter');
+      console.log('[REC_HARDLOAD_OK] window.__createRecorder:', typeof window.__createRecorder);
+      console.log('[REC_HARDLOAD_OK] window.__createNativeRecorder:', typeof window.__createNativeRecorder);
+      console.log('[REC_HARDLOAD_OK] window.__getRecorder:', typeof window.__getRecorder);
+      console.log('[REC_HARDLOAD_OK] Protected closure storage:', typeof PROTECTED_RECORDER_STORAGE);
+      
+      // ========================================================================
+      // DART-FRIENDLY WRAPPER (iOS Safari JS interop workaround)
+      // ========================================================================
+      // iOS Safari has issues with Dart calling complex factory functions
+      // This wrapper handles all the logic in pure JavaScript and just returns the recorder
+      window.createRecorderForDart = async function(stream) {
+        console.log('[DART_WRAPPER] 🎬 Creating recorder for Dart with stream:', !!stream);
+        
+        try {
+          // Try each factory method in order of reliability
+          let factory = null;
+          
+          // Method 1: Direct window property (most reliable)
+          if (typeof window.__createRecorder === 'function') {
+            console.log('[DART_WRAPPER] Using window.__createRecorder');
+            factory = window.__createRecorder;
+          }
+          // Method 2: Getter function
+          else if (typeof window.__getRecorder === 'function') {
+            console.log('[DART_WRAPPER] Using window.__getRecorder()');
+            factory = window.__getRecorder();
+          }
+          // Method 3: Protected closure
+          else if (PROTECTED_RECORDER_STORAGE) {
+            console.log('[DART_WRAPPER] Using PROTECTED_RECORDER_STORAGE');
+            factory = PROTECTED_RECORDER_STORAGE.getCreateRecorder();
+          }
+          
+          if (typeof factory !== 'function') {
+            throw new Error('No recorder factory available');
+          }
+          
+          // Call factory with stream and return recorder
+          console.log('[DART_WRAPPER] Calling factory with stream...');
+          const recorder = await factory(stream);
+          console.log('[DART_WRAPPER] ✅ Recorder created successfully:', !!recorder);
+          
+          return recorder;
+        } catch (error) {
+          console.error('[DART_WRAPPER] ❌ Failed to create recorder:', error);
+          throw error;
+        }
+      };
+      
+      console.log('[DART_WRAPPER] ✅ createRecorderForDart wrapper installed');
+    </script>
+    
+    <!-- ================================================================== -->
+    <!-- VIDEO METADATA EXTRACTION (for quality validation) -->
+    <!-- ================================================================== -->
+    <script>
+      // Extract video metadata (width, height, duration, rotation) from File
+      window.extractVideoMetadata = function(file) {
+        return new Promise((resolve, reject) => {
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.muted = true;
+          video.playsInline = true;
+          
+          video.onloadedmetadata = function() {
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            const duration = video.duration;
+            
+            console.log('[VIDEO_META] Raw dimensions:', width, 'x', height);
+            console.log('[VIDEO_META] Duration:', duration.toFixed(2), 'seconds');
+            
+            // Clean up
+            URL.revokeObjectURL(video.src);
+            
+            resolve({
+              width: width,
+              height: height,
+              duration: duration,
+              aspectRatio: width / height,
+              isPortrait: height > width,
+              isLandscape: width > height,
+              size: file.size,
+              type: file.type
+            });
+          };
+          
+          video.onerror = function() {
+            console.error('[VIDEO_META] Failed to load video metadata');
+            URL.revokeObjectURL(video.src);
+            reject(new Error('Failed to load video metadata'));
+          };
+          
+          // Create object URL and load video
+          video.src = URL.createObjectURL(file);
+        });
+      };
+      
+      console.log('[VIDEO_META] ✅ Metadata extraction helper installed');
+    </script>
+    
+    <!-- ================================================================== -->
+    <!-- HYBRID RECORDING SYSTEM: Native File Input Fallback for iOS -->
+    <!-- ================================================================== -->
+    <script>
+      (function() {
+        console.log('[HYBRID_REC] 🎬 Initializing hybrid recording system...');
+        
+        // ========================================================================
+        // DETECTION LOGIC
+        // ========================================================================
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua) || 
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isReplit = /Replit|Bonsai|MobileSafari|CriOS|WebView/.test(ua);
+        const useNativeCapture = isIOS || isReplit;
+        
+        console.log('[HYBRID_REC] Detection results:');
+        console.log('[HYBRID_REC]   - iOS detected:', isIOS);
+        console.log('[HYBRID_REC]   - Replit/WebView detected:', isReplit);
+        console.log('[HYBRID_REC]   - Use native capture:', useNativeCapture);
+        
+        // Store detection result globally for Dart access
+        window.__useNativeCapture = useNativeCapture;
+        
+        // ========================================================================
+        // CREATE HIDDEN FILE INPUT FOR NATIVE CAMERA
+        // ========================================================================
+        let fileInput = null;
+        let pendingResolve = null;
+        let pendingReject = null;
+        let lastCaptureTime = 0;
+        const DEBOUNCE_MS = 1500; // Prevent double-taps
+        
+        if (useNativeCapture) {
+          console.log('[HYBRID_REC] Creating hidden file input for native camera...');
+          
+          fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          // Request highest quality video capture
+          fileInput.accept = 'video/*;capture=camcorder';
+          fileInput.capture = 'user'; // Request front camera by default
+          fileInput.style.display = 'none';
+          fileInput.id = 'native-video-capture';
+          
+          // Add quality hints as data attributes for mobile browsers
+          fileInput.setAttribute('data-quality', 'high');
+          fileInput.setAttribute('data-resolution', '1080p');
+          
+          console.log('[HYBRID_REC] ✅ Native camera configured for maximum quality (1080p+)');
+          
+          // Handle file selection
+          fileInput.addEventListener('change', async function(event) {
+            console.log('[CAPTURE_FILE] File input changed');
+            
+            const files = event.target.files;
+            if (files && files.length > 0) {
+              const videoFile = files[0];
+              console.log('[CAPTURE_FILE] Native recording selected:', {
+                name: videoFile.name,
+                size: videoFile.size,
+                type: videoFile.type
+              });
+              
+              // Extract video metadata for quality validation
+              try {
+                const metadata = await extractVideoMetadata(videoFile);
+                console.log('[VIDEO_QUALITY] ✅ Metadata extracted:', metadata);
+                
+                // Store metadata on the File object for later use
+                videoFile._metadata = metadata;
+                
+                // Quality check
+                const minWidth = 720;
+                const minHeight = 720;
+                if (metadata.width < minWidth || metadata.height < minHeight) {
+                  console.warn(`[VIDEO_QUALITY] ⚠️ Low resolution: ${metadata.width}x${metadata.height} (minimum ${minWidth}x${minHeight})`);
+                }
+                
+                const qualityLabel = metadata.width >= 1920 ? '1080p+' : 
+                                    metadata.width >= 1280 ? '720p' : 
+                                    '360p';
+                console.log(`[VIDEO_QUALITY] Recording quality: ${qualityLabel} (${metadata.width}x${metadata.height})`);
+              } catch (e) {
+                console.warn('[VIDEO_QUALITY] Failed to extract metadata:', e);
+              }
+              
+              if (pendingResolve) {
+                pendingResolve(videoFile);
+                pendingResolve = null;
+                pendingReject = null;
+              }
+              
+              // Reset input for next recording
+              fileInput.value = '';
+            } else {
+              console.log('[CAPTURE_ABORT] No file selected - user cancelled');
+              if (pendingReject) {
+                pendingReject(new Error('User cancelled recording'));
+                pendingResolve = null;
+                pendingReject = null;
+              }
+            }
+          });
+          
+          document.body.appendChild(fileInput);
+          console.log('[HYBRID_REC] ✅ File input created and attached to DOM');
+        }
+        
+        // ========================================================================
+        // TRACK CLEANUP HELPER
+        // ========================================================================
+        function stopAllMediaTracks() {
+          console.log('[CAPTURE_READY] Stopping all active media tracks...');
+          
+          let stoppedCount = 0;
+          
+          // Stop tracks from all video elements
+          try {
+            const videoElements = document.querySelectorAll('video');
+            videoElements.forEach((video, idx) => {
+              if (video.srcObject) {
+                const stream = video.srcObject;
+                stream.getTracks().forEach(track => {
+                  console.log(`[CAPTURE_READY] Stopping track: ${track.kind} (video element ${idx})`);
+                  track.stop();
+                  stoppedCount++;
+                });
+                video.srcObject = null;
+              }
+            });
+          } catch (e) {
+            console.warn('[CAPTURE_READY] Error stopping video element tracks:', e);
+          }
+          
+          // Also check for any stored streams in window
+          try {
+            if (window.__ACTIVE_PREVIEW_STREAM) {
+              window.__ACTIVE_PREVIEW_STREAM.getTracks().forEach(track => {
+                console.log(`[CAPTURE_READY] Stopping track from stored stream: ${track.kind}`);
+                track.stop();
+                stoppedCount++;
+              });
+              window.__ACTIVE_PREVIEW_STREAM = null;
+            }
+          } catch (e) {
+            console.warn('[CAPTURE_READY] Error stopping stored stream:', e);
+          }
+          
+          console.log(`[CAPTURE_READY] ✅ Stopped ${stoppedCount} media tracks`);
+          return stoppedCount;
+        }
+        
+        // ========================================================================
+        // HYBRID RECORDER API (exposed to Dart)
+        // ========================================================================
+        
+        // Function to check if we should use native capture
+        window.shouldUseNativeCapture = function() {
+          return useNativeCapture;
+        };
+        
+        // Function to start recording (hybrid)
+        window.startHybridRecording = function(cameraFacing) {
+          console.log('[CAPTURE_INVOCATE] startHybridRecording called, facing:', cameraFacing);
+          console.log('[CAPTURE_READY] UA:', navigator.userAgent);
+          
+          // ========================================================================
+          // DEBOUNCE CHECK
+          // ========================================================================
+          const now = Date.now();
+          const timeSinceLastCapture = now - lastCaptureTime;
+          
+          if (timeSinceLastCapture < DEBOUNCE_MS) {
+            console.log(`[CAPTURE_BLOCK] Debounce active (${timeSinceLastCapture}ms < ${DEBOUNCE_MS}ms)`);
+            return Promise.reject(new Error('Please wait before recording again'));
+          }
+          
+          lastCaptureTime = now;
+          
+          if (useNativeCapture) {
+            // Native file input path
+            console.log('[CAPTURE_INVOCATE] Using native file input path');
+            
+            if (!fileInput) {
+              return Promise.reject(new Error('File input not initialized'));
+            }
+            
+            // ========================================================================
+            // CRITICAL: Stop all getUserMedia tracks to prevent "on a call" error
+            // ========================================================================
+            const stoppedCount = stopAllMediaTracks();
+            console.log(`[CAPTURE_READY] Stopped ${stoppedCount} tracks - native camera should open cleanly`);
+            
+            // Update capture attribute based on camera facing
+            if (cameraFacing === 'front' || cameraFacing === 'user') {
+              fileInput.capture = 'user';
+              console.log('[CAPTURE_INVOCATE] Set capture=user (front camera)');
+            } else {
+              fileInput.capture = 'environment';
+              console.log('[CAPTURE_INVOCATE] Set capture=environment (back camera)');
+            }
+            
+            // Return a promise that resolves when user finishes recording
+            return new Promise((resolve, reject) => {
+              pendingResolve = resolve;
+              pendingReject = reject;
+              
+              // Add timeout to prevent infinite hang
+              const timeout = setTimeout(() => {
+                if (pendingReject) {
+                  console.log('[CAPTURE_ABORT] Timeout waiting for native camera');
+                  pendingReject(new Error('Camera timeout'));
+                  pendingResolve = null;
+                  pendingReject = null;
+                }
+              }, 120000); // 2 minute timeout
+              
+              // Trigger the file input click
+              console.log('[CAPTURE_INVOCATE] Triggering file input click...');
+              fileInput.click();
+              
+              // Clear timeout when promise resolves/rejects
+              const originalResolve = pendingResolve;
+              const originalReject = pendingReject;
+              pendingResolve = (result) => {
+                clearTimeout(timeout);
+                if (originalResolve) originalResolve(result);
+              };
+              pendingReject = (error) => {
+                clearTimeout(timeout);
+                if (originalReject) originalReject(error);
+              };
+            });
+          } else {
+            // MediaRecorder path (desktop browsers)
+            console.log('[CAPTURE_INVOCATE] Using MediaRecorder path - Dart should handle this');
+            return Promise.reject(new Error('Use MediaRecorder path for this browser'));
+          }
+        };
+        
+        console.log('[HYBRID_REC] ✅ Hybrid recording system initialized');
+        console.log('[HYBRID_REC] shouldUseNativeCapture():', window.shouldUseNativeCapture());
+      })();
+    </script>
+    
+    <!-- ================================================================== -->
+    <!-- LEVEL 1: Cache-bust and log overlay (run AFTER recorder factory) -->
+    <!-- ================================================================== -->
+    
+    <!-- Cache-busting script to clear old cached assets -->
+    <script>
+      (async function() {
+        console.log('[CACHE_BUST] 🔄 Force cache clear initiated...');
+        
+        try {
+          // Clear all browser caches
+          if ('caches' in window) {
+            const names = await caches.keys();
+            console.log('[CACHE_BUST] Found caches:', names.length);
+            for (const name of names) {
+              await caches.delete(name);
+              console.log('[CACHE_BUST] ❌ Deleted cache:', name);
+            }
+          }
+          
+          // Unregister all service workers
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            console.log('[CACHE_BUST] Found service workers:', registrations.length);
+            for (const registration of registrations) {
+              await registration.unregister();
+              console.log('[CACHE_BUST] ❌ Unregistered SW:', registration.scope);
+            }
+          }
+          
+          console.log('[CACHE_BUST] ✅ All caches cleared');
+        } catch (err) {
+          console.warn('[CACHE_BUST] Error clearing caches:', err.message);
+        }
+      })();
+    </script>
+    
+    <!-- Persistence check: Verify factory survives Flutter init -->
+    <script>
+      // Wait for Flutter to boot, then verify factory is still accessible
+      setTimeout(function() {
+        console.log('[REC_PERSIST] 🔍 Checking if recorder factory survived Flutter init...');
+        
+        const onWindow = typeof window.__createRecorder === 'function';
+        const onGlobalThis = typeof globalThis.__createRecorder === 'function';
+        const getter = typeof window.__getRecorder === 'function';
+        
+        console.log('[REC_PERSIST] window.__createRecorder:', onWindow ? '✓ function' : '❌ ' + typeof window.__createRecorder);
+        console.log('[REC_PERSIST] globalThis.__createRecorder:', onGlobalThis ? '✓ function' : '❌ ' + typeof globalThis.__createRecorder);
+        console.log('[REC_PERSIST] window.__getRecorder:', getter ? '✓ function' : '❌ ' + typeof window.__getRecorder);
+        
+        if (getter) {
+          try {
+            const retrieved = window.__getRecorder();
+            console.log('[REC_PERSIST] __getRecorder() returned:', typeof retrieved);
+            if (typeof retrieved === 'function') {
+              console.log('[REC_PERSIST] ✅ SUCCESS - Factory accessible via getter after Flutter boot');
+            } else {
+              console.error('[REC_PERSIST] ❌ FAIL - Getter returned non-function:', typeof retrieved);
+            }
+          } catch (e) {
+            console.error('[REC_PERSIST] ❌ FAIL - Getter threw error:', e.message);
+          }
+        } else {
+          console.error('[REC_PERSIST] ❌ CRITICAL - Getter function lost during Flutter init!');
+        }
+      }, 5000); // Check 5 seconds after page load
+    </script>
+    
+    
+    <!-- ================================================================== -->
+    <!-- LEVEL 2: Flutter initialization -->
+    <!-- ================================================================== -->
+    
+    <script>
+      // Service worker disabled for Replit iframe environment
+      // SW registration fails in sandboxed iframes, breaking Image.asset loading
+      var serviceWorkerVersion = null;
+      window._flutter = window._flutter || {};
+      window._flutter.buildConfig = {
+        builds: [
+          {
+            compileTarget: 'dart2js',
+            renderer: 'html',
+            mainJsPath: 'main.dart.js',
+          }
+        ]
+      };
+    </script>
+    
+    <script>
+      window.addEventListener('load', function(ev) {
+        _flutter.loader.load({
+          // Service worker disabled - assets load directly without SW cache
+        });
+      });
+    </script>
+    <script src="flutter.js" defer></script>
+  </body>
+</html>

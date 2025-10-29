@@ -1,0 +1,43 @@
+name: ynfny
+description: A new Flutter project.
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  cached_network_image: ^3.3.1
+  camera: ^0.11.0+2
+  connectivity_plus: ^6.1.4
+  cupertino_icons: ^1.0.8
+  dio: ^5.4.0
+  file_picker: ^8.1.7
+  fl_chart: ^0.65.0
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.0.9
+  fluttertoast: ^8.2.4
+  geolocator: ^10.1.0
+  google_fonts: ^6.1.0
+  image_picker: ^1.1.2
+  path_provider: ^2.1.5
+  pay: ^3.2.1
+  permission_handler: ^11.1.0
+  pointer_interceptor: ^0.10.1
+  record: ^6.0.0
+  shared_preferences: ^2.2.2
+  stripe_platform_interface: ^11.5.0
+  supabase_flutter: ^2.5.6
+  universal_html: ^2.2.4
+  vector_math: ^2.1.4
+  video_player: ^2.8.1
+  visibility_detector: ^0.4.0+2
+  web: ^1.1.0
+dev_dependencies:
+  flutter_lints: 4.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

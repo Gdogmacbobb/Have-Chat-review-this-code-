@@ -1,0 +1,5 @@
+analyzer:
+  exclude:
+    - "backup_20250914_033112/**"
+    - "build/**"
+    - ".dart_tool/**"

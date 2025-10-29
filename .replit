@@ -1,0 +1,104 @@
+modules = ["bash", "swift-5.8", "nodejs-20", "flutter", "postgresql-16"]
+[agent]
+expertMode = true
+integrations = ["javascript_database:1.0.0", "javascript_object_storage:1.0.0"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["flutter", "ffmpeg-full", "openssh_gssapi", "imagemagick"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Flutter Web Server"
+
+[[workflows.workflow]]
+name = "Flutter Web Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 36079
+externalPort = 3002
+
+[[ports]]
+localPort = 36647
+externalPort = 6800
+
+[[ports]]
+localPort = 37251
+externalPort = 3001
+
+[[ports]]
+localPort = 37397
+externalPort = 3003
+
+[[ports]]
+localPort = 37755
+externalPort = 5000
+
+[[ports]]
+localPort = 39007
+externalPort = 8099
+
+[[ports]]
+localPort = 40331
+externalPort = 5173
+
+[[ports]]
+localPort = 40351
+externalPort = 8081
+
+[[ports]]
+localPort = 41053
+externalPort = 8080
+
+[[ports]]
+localPort = 42881
+externalPort = 8008
+
+[[ports]]
+localPort = 42923
+externalPort = 9000
+
+[[ports]]
+localPort = 42955
+externalPort = 8000
+
+[[ports]]
+localPort = 44165
+externalPort = 4200
+
+[[ports]]
+localPort = 44229
+externalPort = 3000
+
+[[ports]]
+localPort = 45237
+externalPort = 6000
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "server.js"]
+build = ["bash", "-c", "./build_web.sh && npm install"]
+
+[objectStorage]
+defaultBucketID = "replit-objstore-fb600afb-b1e2-4d4d-9d12-c3d57566f2d6"

@@ -1,0 +1,46 @@
+# Overview
+YNFNY is a cross-platform Flutter mobile and web social platform for street performers. It integrates various AI services, Supabase for backend, and Stripe for payments. The project aims to connect artists with audiences, monetize performances, and features a production-ready video preview system with TikTok-style UI and synchronized audio replay. The business vision is to create an immersive platform for street art, fostering community and enabling direct financial support for performers, tapping into a niche market.
+
+# User Preferences
+Preferred communication style: Simple, everyday language.
+
+# System Architecture
+
+## Frontend Architecture
+The application uses Flutter for a unified codebase across mobile and web, featuring a TikTok/Reels-style UI for vertical video and an optimized upload screen. UI/UX prioritizes a polished, intuitive, and immersive experience, particularly for video interactions, with consistent component design and secure environment variable management. Authentication screens feature responsive logo rendering and keyboard-safe layouts using `SingleChildScrollView` with scrollable form content. Primary action buttons use a reusable `PrimaryButton` widget with fixed 56px height positioned in `Scaffold.bottomNavigationBar` wrapped in `SafeArea`, ensuring consistent rendering without compression across all mobile devices. This architecture separates scrollable content from fixed action buttons, meeting Material Design tap target requirements and preventing layout issues from keyboard display or varying screen sizes.
+
+## Backend Architecture
+A serverless approach is utilized with Supabase as the primary Backend-as-a-Service (BaaS) for authentication, database, and real-time functionalities. Deno-based edge functions handle core business logic and payment processing.
+
+## Data Storage Solutions
+Secure PostgreSQL with Row-Level Security (RLS) is used for data, with real-time capabilities via Supabase subscriptions. Replit Object Storage handles persistent video and thumbnail files with ACL-based access control, served via Express routes with RFC-compliant range request support. A server-side upload proxy eliminates CORS issues.
+
+## Authentication and Authorization
+Supabase Auth manages user registration, login, and session management, secured by JWT tokens and a two-layer security model with UI controls and database-level RLS. A RoleGate Widget System enforces UI and page access. A hard-stop atomic registration system, implemented via server-side Edge Functions, guarantees zero orphaned authentication accounts by performing user and profile creation in a single, rollback-safe transaction with comprehensive server-side validation and idempotency.
+
+## System Design Choices
+The system is designed for scalability using serverless functions and managed services. UI/UX decisions include immersive edge-to-edge video display, layered UI components, and consistent badging. An inline canvas-based thumbnail selection system allows users to scrub through video frames. Dynamic responsive layouts are achieved using `SafeArea` and `LayoutBuilder` for precise component positioning and to prevent overlaps across diverse screen sizes.
+
+## Video Playback Architecture
+A `UnifiedVideoPlayer` component ensures consistent video playback across all feed contexts, featuring race-condition-safe initialization, client-side URL normalization, and an interactive scrubber with throttled seeks. Dynamic play/pause button overlays provide TikTok-style controls. Comprehensive lifecycle safety guards prevent crashes, and type safety is ensured through safe null checks. The backend supports RFC-compliant HTTP range requests for reliable iOS Safari video streaming. A hybrid recording system bypasses JavaScript for iOS using native HTML5 file input, while desktop browsers use MediaRecorder with Whammy.js fallback. iOS Safari interop issues are resolved using `js_util` functions, and "On a Call" errors are fixed by media track cleanup. Interactive controls use a layered `Stack` architecture with `Listener` widgets and `IgnorePointer` to ensure proper pointer event handling on iOS Safari. Feed videos play with audio enabled by default, with user-toggleable mute/unmute functionality. Video orientation and quality are managed via a shared orientation state calculated from metadata, ensuring consistent rotation across previews and thumbnails. Thumbnail generation renders in portrait orientation with intelligent dimension swapping. Camera recording supports quality presets. Background video playback is prevented through comprehensive visibility and app lifecycle tracking, ensuring videos only play when visible on-screen and pausing when the app is in the background. A dedicated full-screen video player for performer profiles reuses `UnifiedVideoPlayer` behavior, mirroring feed layout with dynamic spacing, extracting real metadata from navigation arguments, and including profile-specific UI elements. A shared `VideoOverlayInfo` widget provides unified bottom-left overlay UI across all video contexts (Discovery feed, Following feed, performer profile thumbnail grid, and full-screen performer profile video player), displaying performer handle, performance type badge, video title, and location with consistent styling. The widget handles field name variations, strips duplicate "@" prefixes, and completely suppresses placeholder entries. The full-screen performer profile video player uses this shared widget, eliminating ~100 lines of duplicated code and ensuring UI parity with Discovery/Following feeds. ProfileService.getUserVideos() performs Supabase join with user_profiles table to retrieve nested performer metadata (performance_type, username, profile_image_url), matching the data pipeline used by Discovery/Following feeds and ensuring complete overlay data for performer profile videos.
+
+## Donation Flow Architecture
+The donation page binds live Supabase data for performer information and video context. Navigation from discovery/following feeds passes `videoId` and `performerId` as route arguments (currently as Map, forward-compatible with DonationRouteArgs model). DonationRepo uses OMEGA architecture: calls server-side RPC `donation_header()` as primary data source, falls back to `v_donation_header` VIEW if RPC fails, with 10-second timeout and comprehensive error logging. The server-side VIEW joins `videos` + `user_profiles` tables with correct schema (location_name/borough, thumbnail_url), eliminating client-side schema mismatches. RLS policies enable public read access for donation header data. The donation page displays loading skeletons during data fetch, error states with user-friendly messages, and graceful fallbacks for missing avatars/thumbnails/locations. Display name falls back to @handle. The page uses fixed 8pt spacing scale throughout (8/12/16/24/32/48/96 px) for Material Design compliance, with all tap targets meeting >=48dp accessibility requirements. An OMEGA debug panel (activated via long-press on "Support Performer" title) exposes route args, loaded data, errors, and diagnostics copy for troubleshooting.
+
+## Wallet & Transaction Management
+The YNF Wallet feature is accessible from the user profile screen via a dedicated tile positioned between Payment Methods and Notification Preferences. The wallet screen displays a balance card with orange gradient styling matching the app's theme, action buttons for adding funds and withdrawing, and a transaction history list showing received donations and withdrawals with relative timestamps. Currently uses sample data for UI demonstration; future integration will connect to live backend transaction data from the donations table.
+
+## Schedule Showtime Feature
+Performers can schedule their upcoming shows via a premium glassmorphic modal overlay accessible from the Edit Profile screen. The Schedule Showtime overlay features an animated neon orange pulse border (2-second cycle), backdrop blur with 70% black overlay, day selector chips for Mon-Sun with gradient selection highlighting, iOS-style time picker with orange accent, and an optional location text field. The overlay includes smooth fade-in/scale entrance animations and saves schedule data to the `user_profiles.performance_schedule` column in Supabase. After successful save, the modal closes cleanly and displays a success toast ("✨ Showtime Added!") from the parent page context, eliminating deactivated context errors. The implementation uses proper state management with animation controller disposal and maintains the YNFNY black + orange theme throughout.
+
+# External Dependencies
+
+## Third-party Services
+- **AI Services**: OpenAI API, Google Gemini API, Anthropic API, Perplexity API.
+- **Payment Processing**: Stripe.
+- **Backend Services**: Supabase.
+
+## Infrastructure
+- **Web Hosting**: Static web deployment with CanvasKit rendering.
+- **Deployment**: Replit autoscale deployment.
+- **Object Storage**: Replit App Storage (Google Cloud Storage-backed) for persistent video and thumbnail files.

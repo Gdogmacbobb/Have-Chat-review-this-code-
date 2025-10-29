@@ -1,0 +1,4 @@
+ports:
+  - port: 5000
+    visibility: public
+    protocol: http
